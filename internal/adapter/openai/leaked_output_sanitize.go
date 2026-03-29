@@ -17,7 +17,7 @@ var leakedMetaMarkerPattern = regexp.MustCompile(`(?i)<[｜\|]\s*(?:assistant|to
 // the sieve fails to capture them (e.g. incomplete blocks at stream end).
 var leakedAgentXMLPattern = regexp.MustCompile(`(?is)</?(?:attempt_completion|ask_followup_question|new_task|result)>`)
 
-func sanitizeLeakedToolHistory(text string) string {
+func sanitizeLeakedOutput(text string) string {
 	if text == "" {
 		return text
 	}
