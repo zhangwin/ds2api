@@ -124,6 +124,14 @@ func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Res
 	}
 
 	responseObj := openaifmt.BuildResponseObject(responseID, model, finalPrompt, result.Thinking, sanitizedText, toolNames)
+	if result.OutputTokens > 0 {
+		if usage, ok := responseObj["usage"].(map[string]any); ok {
+			usage["output_tokens"] = result.OutputTokens
+			if input, ok := usage["input_tokens"].(int); ok {
+				usage["total_tokens"] = input + result.OutputTokens
+			}
+		}
+	}
 	h.getResponseStore().put(owner, responseID, responseObj)
 	writeJSON(w, http.StatusOK, responseObj)
 }

@@ -8,7 +8,7 @@ Thanks for your interest in contributing to DS2API!
 
 ### Prerequisites
 
-- Go 1.24+
+- Go 1.26+
 - Node.js 20+ (for WebUI development)
 - npm (bundled with Node.js)
 
@@ -94,6 +94,7 @@ Manually build WebUI to `static/admin/`:
 
 ```text
 ds2api/
+├── app/                     # Shared HTTP handler assembly (local + serverless)
 ├── cmd/
 │   ├── ds2api/              # Local/container entrypoint
 │   └── ds2api-tests/        # End-to-end testsuite entrypoint
@@ -110,8 +111,8 @@ ds2api/
 │   ├── admin/               # Admin API handlers
 │   ├── auth/                # Auth and JWT
 │   ├── claudeconv/          # Claude message conversion
-│   ├── compat/              # Compatibility helpers
-│   ├── config/              # Config loading and hot-reload
+│   ├── compat/              # Go-version compatibility and regression helpers
+│   ├── config/              # Config loading, validation, and hot-reload
 │   ├── deepseek/            # DeepSeek client, PoW WASM
 │   ├── js/                  # Node runtime stream/compat logic
 │   ├── devcapture/          # Dev packet capture
@@ -120,8 +121,10 @@ ds2api/
 │   ├── server/              # HTTP routing (chi router)
 │   ├── sse/                 # SSE parsing utilities
 │   ├── stream/              # Unified stream consumption engine
-│   ├── testsuite/           # Testsuite core logic
+│   ├── testsuite/           # Testsuite framework and scenario orchestration
+│   ├── translatorcliproxy/  # CLIProxy bridge and stream writer
 │   ├── util/                # Common utilities
+│   ├── version/             # Version parsing and comparison
 │   └── webui/               # WebUI static hosting
 ├── webui/                   # React WebUI source
 │   └── src/
@@ -130,7 +133,10 @@ ds2api/
 │       ├── components/      # Shared components
 │       └── locales/         # Language packs
 ├── scripts/                 # Build and test scripts
-├── tests/                   # Unit tests, Node tests, and end-to-end tests
+├── tests/
+│   ├── compat/              # Compatibility fixtures and expected outputs
+│   ├── node/                # Node-side unit tests
+│   └── scripts/             # Test script entrypoints (unit/e2e)
 ├── plans/                   # Plans, gates, and manual smoke-test records
 ├── static/admin/            # WebUI build output (not committed)
 ├── Dockerfile               # Multi-stage build

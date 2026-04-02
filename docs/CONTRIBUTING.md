@@ -8,7 +8,7 @@
 
 ### 前置要求
 
-- Go 1.24+
+- Go 1.26+
 - Node.js 20+（WebUI 开发时）
 - npm（随 Node.js 提供）
 
@@ -94,6 +94,7 @@ docker-compose -f docker-compose.dev.yml up
 
 ```text
 ds2api/
+├── app/                     # 统一 HTTP Handler 装配（本地 + Serverless）
 ├── cmd/
 │   ├── ds2api/              # 本地/容器启动入口
 │   └── ds2api-tests/        # 端到端测试集入口
@@ -110,8 +111,8 @@ ds2api/
 │   ├── admin/               # Admin API handlers
 │   ├── auth/                # 鉴权与 JWT
 │   ├── claudeconv/          # Claude 消息格式转换
-│   ├── compat/              # 兼容性辅助
-│   ├── config/              # 配置加载与热更新
+│   ├── compat/              # Go 版本兼容与回归测试辅助
+│   ├── config/              # 配置加载、校验与热更新
 │   ├── deepseek/            # DeepSeek 客户端、PoW WASM
 │   ├── js/                  # Node 运行时流式/兼容逻辑
 │   ├── devcapture/          # 开发抓包
@@ -120,8 +121,10 @@ ds2api/
 │   ├── server/              # HTTP 路由（chi router）
 │   ├── sse/                 # SSE 解析工具
 │   ├── stream/              # 统一流式消费引擎
-│   ├── testsuite/           # 测试集核心逻辑
+│   ├── testsuite/           # 测试集框架与场景编排
+│   ├── translatorcliproxy/  # CLIProxy 桥接与流式写入
 │   ├── util/                # 通用工具
+│   ├── version/             # 版本解析与比较
 │   └── webui/               # WebUI 静态托管
 ├── webui/                   # React WebUI 源码
 │   └── src/
@@ -130,7 +133,10 @@ ds2api/
 │       ├── components/      # 通用组件
 │       └── locales/         # 语言包
 ├── scripts/                 # 构建与测试脚本
-├── tests/                   # 单元测试、Node 测试与端到端测试
+├── tests/
+│   ├── compat/              # 兼容夹具与期望输出
+│   ├── node/                # Node 侧单元测试
+│   └── scripts/             # 测试脚本入口（unit/e2e）
 ├── plans/                   # 计划、门禁和手工烟测记录
 ├── static/admin/            # WebUI 构建产物（不提交）
 ├── Dockerfile               # 多阶段构建

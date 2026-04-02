@@ -28,42 +28,63 @@ DS2API converts DeepSeek Web chat capability into OpenAI-compatible, Claude-comp
 
 ```mermaid
 flowchart LR
-    Client["🖥️ Clients\n(OpenAI / Claude / Gemini compat)"]
+    Client["🖥️ Clients / SDKs\n(OpenAI / Claude / Gemini)"]
+    Upstream["☁️ DeepSeek API"]
 
-    subgraph DS2API["DS2API Service"]
-        direction TB
-        CORS["CORS Middleware"]
-        Auth["🔐 Auth Middleware"]
+    subgraph DS2API["DS2API 3.x (Unified OpenAI Core)"]
+        Router["chi Router + Middleware\n(RequestID / RealIP / Logger / Recoverer / CORS)"]
 
-        subgraph Adapters["Adapter Layer"]
-            OA["OpenAI Adapter\n/v1/*"]
-            CA["Claude Adapter\n/anthropic/*"]
-            GA["Gemini Adapter\n/v1beta/models/*"]
+        subgraph Adapters["Protocol Adapters"]
+            OA["OpenAI\n/v1/*"]
+            CA["Claude\n/anthropic/* + /v1/messages"]
+            GA["Gemini\n/v1beta/models/* + /v1/models/*"]
+            Admin["Admin API\n/admin/*"]
+            WebUI["WebUI\n/admin (static hosting)"]
         end
 
-        subgraph Support["Support Modules"]
-            Pool["📦 Account Pool / Queue"]
-            PoW["⚙️ PoW WASM\n(wazero)"]
+        subgraph Runtime["Runtime + Core Capabilities"]
+            Bridge["CLIProxy Bridge\n(multi-protocol <-> OpenAI)"]
+            OAEngine["OpenAI ChatCompletions\n(unified tools + stream semantics)"]
+            Auth["Auth Resolver\n(API key / bearer / x-goog-api-key)"]
+            Pool["Account Pool + Queue\n(in-flight slots + wait queue)"]
+            DSClient["DeepSeek Client\n(session / auth / HTTP)"]
+            Pow["PoW WASM\n(wazero preload)"]
+            Tool["Tool Sieve\n(Go/Node semantic parity)"]
         end
-
-        Admin["🛠️ Admin API\n/admin/*"]
-        WebUI["🌐 WebUI\n(/admin)"]
     end
 
-    DS["☁️ DeepSeek API"]
+    Client --> Router
+    Router --> OA & CA & GA
+    Router --> Admin
+    Router --> WebUI
 
-    Client -- "Request" --> CORS --> Auth
-    Auth --> OA & CA & GA
-    OA & CA & GA -- "Call" --> DS
-    Auth --> Admin
-    OA & CA & GA -. "Rotate accounts" .-> Pool
-    OA & CA & GA -. "Compute PoW" .-> PoW
-    DS -- "Response" --> Client
+    OA --> OAEngine
+    CA & GA --> Bridge
+    Bridge --> OAEngine
+    OAEngine --> Auth
+    OAEngine -.account rotation.-> Pool
+    OAEngine -.tool-call parsing.-> Tool
+    OAEngine -.PoW solving.-> Pow
+    Auth --> DSClient
+    DSClient --> Upstream
+    Upstream --> DSClient
+    OAEngine --> Bridge
+    Bridge --> Client
 ```
 
 - **Backend**: Go (`cmd/ds2api/`, `api/`, `internal/`), no Python runtime
 - **Frontend**: React admin panel (`webui/`), served as static build at runtime
 - **Deployment**: local run, Docker, Vercel serverless, Linux systemd
+
+### 3.0 Architecture Changes (vs older releases)
+
+- **Unified routing core**: all protocol entries are now centralized through `internal/server/router.go`, with OpenAI / Claude / Gemini / Admin / WebUI routes registered in one tree to avoid multi-entry drift.
+- **Unified execution chain**: Claude/Gemini entries are translated by `internal/translatorcliproxy`, then executed through `openai.ChatCompletions` for shared tool-calling and stream semantics, then translated back to the client protocol.
+- **Cleaner adapter boundaries**: `internal/adapter/{claude,gemini}` handles protocol wrappers, while `internal/adapter/openai` remains the execution core; upstream DeepSeek calls are retained only in the OpenAI core.
+- **Tool-calling parity across runtimes**: Go (`internal/util`) and Vercel Node (`internal/js/helpers/stream-tool-sieve`) follow aligned parsing/anti-leak semantics across JSON / XML / invoke / text-kv inputs.
+- **Config/runtime separation**: static config (`config`) and runtime policy (`settings`) are managed independently via Admin APIs, enabling hot updates and password rotation with JWT invalidation.
+- **Streaming behavior upgrade**: `/v1/responses` and `/v1/chat/completions` now share a more consistent incremental tool-call emission strategy across SDK ecosystems.
+- **Improved operability**: `/healthz`, `/readyz`, `/admin/version`, and `/admin/dev/captures` form a tighter post-deploy diagnostics loop.
 
 ## Key Capabilities
 
@@ -144,7 +165,7 @@ Recommended per deployment mode:
 
 ### Option 1: Local Run
 
-**Prerequisites**: Go 1.24+, Node.js 20+ (only if building WebUI locally)
+**Prerequisites**: Go 1.26+, Node.js 20+ (only if building WebUI locally)
 
 ```bash
 # 1. Clone
@@ -406,6 +427,7 @@ Response fields include:
 
 ```text
 ds2api/
+├── app/                     # Unified HTTP handler assembly (shared by local + serverless)
 ├── cmd/
 │   ├── ds2api/              # Local / container entrypoint
 │   └── ds2api-tests/        # End-to-end testsuite entrypoint
@@ -422,8 +444,8 @@ ds2api/
 │   ├── admin/               # Admin API handlers (incl. Settings hot-reload)
 │   ├── auth/                # Auth and JWT
 │   ├── claudeconv/          # Claude message format conversion
-│   ├── compat/              # Compatibility helpers
-│   ├── config/              # Config loading and hot-reload
+│   ├── compat/              # Go-version compatibility and regression helpers
+│   ├── config/              # Config loading, validation, and hot-reload
 │   ├── deepseek/            # DeepSeek API client, PoW WASM
 │   ├── js/                  # Node runtime stream/compat logic
 │   ├── devcapture/          # Dev packet capture module
@@ -432,7 +454,10 @@ ds2api/
 │   ├── server/              # HTTP routing and middleware (chi router)
 │   ├── sse/                 # SSE parsing utilities
 │   ├── stream/              # Unified stream consumption engine
+│   ├── testsuite/           # End-to-end testsuite framework and case orchestration
+│   ├── translatorcliproxy/  # CLIProxy bridge and stream writer components
 │   ├── util/                # Common utilities
+│   ├── version/             # Version parsing/comparison and tag normalization
 │   └── webui/               # WebUI static file serving and auto-build
 ├── webui/                   # React WebUI source (Vite + Tailwind)
 │   └── src/
@@ -444,6 +469,7 @@ ds2api/
 │   └── build-webui.sh       # Manual WebUI build script
 ├── tests/
 │   ├── compat/              # Compatibility fixtures and expected outputs
+│   ├── node/                # Node-side unit tests (chat-stream / tool-sieve)
 │   └── scripts/             # Unified test script entrypoints (unit/e2e)
 ├── docs/                    # Deployment / contributing / testing docs
 ├── static/admin/            # WebUI build output (not committed to Git)
