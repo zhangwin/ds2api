@@ -30,6 +30,30 @@ func TestParseToolCallsSupportsClaudeXMLToolCall(t *testing.T) {
 	}
 }
 
+func TestParseToolCallsSupportsMultilineCDATAAndRepeatedXMLTags(t *testing.T) {
+	text := `<tool_call><tool_name>write_file</tool_name><parameters><path>script.sh</path><content><![CDATA[#!/bin/bash
+echo "hello"
+]]></content><item>first</item><item>second</item></parameters></tool_call>`
+	calls := ParseToolCalls(text, []string{"write_file"})
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 call, got %#v", calls)
+	}
+	if calls[0].Name != "write_file" {
+		t.Fatalf("expected tool name write_file, got %q", calls[0].Name)
+	}
+	if calls[0].Input["path"] != "script.sh" {
+		t.Fatalf("expected path argument, got %#v", calls[0].Input)
+	}
+	content, _ := calls[0].Input["content"].(string)
+	if !strings.Contains(content, "#!/bin/bash") || !strings.Contains(content, "echo \"hello\"") {
+		t.Fatalf("expected multiline CDATA content to be preserved, got %#v", calls[0].Input["content"])
+	}
+	items, ok := calls[0].Input["item"].([]any)
+	if !ok || len(items) != 2 {
+		t.Fatalf("expected repeated XML tags to become an array, got %#v", calls[0].Input["item"])
+	}
+}
+
 func TestParseToolCallsSupportsCanonicalXMLParametersJSON(t *testing.T) {
 	text := `<tool_call><tool_name>get_weather</tool_name><parameters>{"city":"beijing","unit":"c"}</parameters></tool_call>`
 	calls := ParseToolCalls(text, []string{"get_weather"})

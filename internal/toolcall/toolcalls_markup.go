@@ -23,8 +23,8 @@ var toolCallMarkupNamePatternByTag = map[string]*regexp.Regexp{
 	"function": regexp.MustCompile(`(?is)<(?:[a-z0-9_:-]+:)?function\b[^>]*>(.*?)</(?:[a-z0-9_:-]+:)?function>`),
 }
 
-// cdataPattern matches CDATA sections to handle them separately from normal tags.
-var cdataPattern = regexp.MustCompile(`(?is)<!\[CDATA\[(.*?)]]>`)
+// cdataPattern matches a standalone CDATA section.
+var cdataPattern = regexp.MustCompile(`(?is)^<!\[CDATA\[(.*?)]]>$`)
 var toolCallMarkupArgsTagNames = []string{"input", "arguments", "argument", "parameters", "parameter", "args", "params"}
 var toolCallMarkupArgsPatternByTag = map[string]*regexp.Regexp{
 	"input":      regexp.MustCompile(`(?is)<(?:[a-z0-9_:-]+:)?input\b[^>]*>(.*?)</(?:[a-z0-9_:-]+:)?input>`),
@@ -119,20 +119,7 @@ func parseMarkupSingleToolCall(attrs string, inner string) ParsedToolCall {
 }
 
 func parseMarkupInput(raw string) map[string]any {
-	raw = strings.TrimSpace(html.UnescapeString(raw))
-	if raw == "" {
-		return map[string]any{}
-	}
-	// Prioritize XML-style KV tags as they are more robust for long text/scripts.
-	if kv := parseMarkupKVObject(raw); len(kv) > 0 {
-		return kv
-	}
-
-	// Fallback to JSON parsing for standard/legacy tool calls.
-	if parsed := parseToolCallInput(raw); len(parsed) > 0 {
-		return parsed
-	}
-	return map[string]any{"_raw": html.UnescapeString(stripTagText(raw))}
+	return parseStructuredToolCallInput(raw)
 }
 
 func parseMarkupKVObject(text string) map[string]any {
@@ -153,27 +140,53 @@ func parseMarkupKVObject(text string) map[string]any {
 		if !strings.EqualFold(key, endKey) {
 			continue
 		}
-		// Robustly extract value to handle CDATA and mixed content
-		value := extractRawTagValue(m[2])
-		if value == "" && m[2] != "" {
-			// If it wasn't empty but extracted to empty, could be whitespace or just tags
-			value = strings.TrimSpace(m[2])
-		}
-
-		if value == "" {
+		value := parseMarkupValue(m[2])
+		if value == nil {
 			continue
 		}
-		var jsonValue any
-		if json.Unmarshal([]byte(value), &jsonValue) == nil {
-			out[key] = jsonValue
-			continue
-		}
-		out[key] = value
+		appendMarkupValue(out, key, value)
 	}
 	if len(out) == 0 {
 		return nil
 	}
 	return out
+}
+
+func parseMarkupValue(inner string) any {
+	value := strings.TrimSpace(extractRawTagValue(inner))
+	if value == "" {
+		return ""
+	}
+
+	if strings.Contains(value, "<") && strings.Contains(value, ">") {
+		if parsed := parseStructuredToolCallInput(value); len(parsed) > 0 {
+			if len(parsed) == 1 {
+				if raw, ok := parsed["_raw"].(string); ok {
+					return raw
+				}
+			}
+			return parsed
+		}
+	}
+
+	var jsonValue any
+	if json.Unmarshal([]byte(value), &jsonValue) == nil {
+		return jsonValue
+	}
+	return value
+}
+
+func appendMarkupValue(out map[string]any, key string, value any) {
+	if existing, ok := out[key]; ok {
+		switch current := existing.(type) {
+		case []any:
+			out[key] = append(current, value)
+		default:
+			out[key] = []any{current, value}
+		}
+		return
+	}
+	out[key] = value
 }
 
 // extractRawTagValue treats the inner content of a tag robustly.

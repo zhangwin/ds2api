@@ -19,7 +19,7 @@ const TOOL_CALL_MARKUP_ARGS_PATTERNS = [
   /<(?:[a-z0-9_:-]+:)?args\b[^>]*>([\s\S]*?)<\/(?:[a-z0-9_:-]+:)?args>/i,
   /<(?:[a-z0-9_:-]+:)?params\b[^>]*>([\s\S]*?)<\/(?:[a-z0-9_:-]+:)?params>/i,
 ];
-const CDATA_PATTERN = /<!\[CDATA\[([\s\S]*?)]]>/i;
+const CDATA_PATTERN = /^<!\[CDATA\[([\s\S]*?)]]>$/i;
 const HTML_ENTITIES_PATTERN = /&[a-z0-9#]+;/gi;
 
 const {
@@ -97,6 +97,9 @@ function parseMarkupSingleToolCall(attrs, inner) {
 
 function parseMarkupInput(raw) {
   const s = toStringSafe(raw).trim();
+  if (!s) {
+    return {};
+  }
   // Prioritize XML-style KV tags (e.g., <arg>val</arg>)
   const kv = parseMarkupKVObject(s);
   if (Object.keys(kv).length > 0) {
@@ -125,17 +128,36 @@ function parseMarkupKVObject(text) {
     if (!key) {
       continue;
     }
-    const valueRaw = extractRawTagValue(m[2]);
-    if (!valueRaw) {
+    const value = parseMarkupValue(m[2]);
+    if (value === undefined || value === null) {
       continue;
     }
-    try {
-      out[key] = JSON.parse(valueRaw);
-    } catch (_err) {
-      out[key] = valueRaw;
-    }
+    appendMarkupValue(out, key, value);
   }
   return out;
+}
+
+function parseMarkupValue(raw) {
+  const s = toStringSafe(extractRawTagValue(raw)).trim();
+  if (!s) {
+    return '';
+  }
+
+  if (s.includes('<') && s.includes('>')) {
+    const nested = parseMarkupInput(s);
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      if (isOnlyRawValue(nested)) {
+        return toStringSafe(nested._raw);
+      }
+      return nested;
+    }
+  }
+
+  try {
+    return JSON.parse(s);
+  } catch (_err) {
+    return s;
+  }
 }
 
 function extractRawTagValue(inner) {
@@ -211,6 +233,27 @@ function parseToolCallInput(v) {
     return {};
   }
   return {};
+}
+
+function appendMarkupValue(out, key, value) {
+  if (Object.prototype.hasOwnProperty.call(out, key)) {
+    const current = out[key];
+    if (Array.isArray(current)) {
+      current.push(value);
+      return;
+    }
+    out[key] = [current, value];
+    return;
+  }
+  out[key] = value;
+}
+
+function isOnlyRawValue(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+    return false;
+  }
+  const keys = Object.keys(obj);
+  return keys.length === 1 && keys[0] === '_raw';
 }
 
 module.exports = {

@@ -50,8 +50,8 @@ When calling tools, emit ONLY raw XML at the very end of your response. No text 
 RULES:
 1) When calling tools, you MUST use the <tool_calls> XML format.
 2) No text is allowed AFTER the XML block.
-3) <parameters> should be a list of XML tags (e.g., <param_name>value</param_name>). For simple inputs, a single-line JSON string is also acceptable.
-4) For long text, scripts, or code content, YOU MUST wrap the value in <![CDATA[ content ]]> to preserve formatting and avoid character escaping errors.
+3) <parameters> should be XML tags, not JSON. Use nested XML elements for structured data (e.g., <param_name>value</param_name>).
+4) For long text, scripts, novels, or code content, YOU MUST wrap the value in <![CDATA[ content ]]> to preserve formatting and avoid character escaping errors.
 5) Multiple tools must be inside the same <tool_calls> root.
 6) Do NOT wrap XML in markdown fences (` + "```" + `).
 7) Do NOT invent parameters. Use only the provided schema.
@@ -97,7 +97,7 @@ Example B — Two tools in parallel:
   </tool_call>
 </tool_calls>
 
-Example C — Tool with complex nested JSON parameters:
+Example C — Tool with complex structured XML parameters:
 <tool_calls>
   <tool_call>
     <tool_name>` + ex3 + `</tool_name>

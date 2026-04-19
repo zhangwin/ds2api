@@ -18,8 +18,6 @@ const (
 	endSentenceMarker     = "<｜end▁of▁sentence｜>"
 	endToolResultsMarker  = "<｜end▁of▁toolresults｜>"
 	endInstructionsMarker = "<｜end▁of▁instructions｜>"
-	openThinkMarker       = "<think>"
-	closeThinkMarker      = "</think>"
 )
 
 func MessagesPrepare(messages []map[string]any) string {
@@ -55,7 +53,7 @@ func MessagesPrepareWithThinking(messages []map[string]any, thinkingEnabled bool
 		lastRole = m.Role
 		switch m.Role {
 		case "assistant":
-			parts = append(parts, formatRoleBlock(assistantMarker, closeThinkMarker+m.Text, endSentenceMarker))
+			parts = append(parts, formatRoleBlock(assistantMarker, m.Text, endSentenceMarker))
 		case "tool":
 			if strings.TrimSpace(m.Text) != "" {
 				parts = append(parts, formatRoleBlock(toolMarker, m.Text, endToolResultsMarker))
@@ -73,19 +71,15 @@ func MessagesPrepareWithThinking(messages []map[string]any, thinkingEnabled bool
 		}
 	}
 	if lastRole != "assistant" {
-		thinkPrefix := closeThinkMarker
-		if thinkingEnabled {
-			thinkPrefix = openThinkMarker
-		}
-		parts = append(parts, assistantMarker+thinkPrefix)
+		parts = append(parts, assistantMarker)
 	}
 	out := strings.Join(parts, "")
 	return markdownImagePattern.ReplaceAllString(out, `[${1}](${2})`)
 }
 
 // formatRoleBlock produces a single concatenated block: marker + text + endMarker.
-// No whitespace is inserted between marker and text to match the official
-// DeepSeek V3.2 chat template encoding.
+// No whitespace is inserted between marker and text so role boundaries stay
+// compact and predictable for downstream parsers.
 func formatRoleBlock(marker, text, endMarker string) string {
 	out := marker + text
 	if strings.TrimSpace(endMarker) != "" {

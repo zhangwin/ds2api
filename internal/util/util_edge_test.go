@@ -195,8 +195,11 @@ func TestMessagesPrepareAssistantMarkers(t *testing.T) {
 	if strings.Count(got, "<｜end▁of▁sentence｜>") != 1 {
 		t.Fatalf("expected one end_of_sentence (assistant only), got %q", got)
 	}
-	if !strings.Contains(got, "<｜Assistant｜></think>Hello!<｜end▁of▁sentence｜>") {
+	if !strings.Contains(got, "<｜Assistant｜>Hello!<｜end▁of▁sentence｜>") {
 		t.Fatalf("expected assistant EOS suffix, got %q", got)
+	}
+	if strings.Contains(got, "<think>") || strings.Contains(got, "</think>") {
+		t.Fatalf("did not expect think tags in prompt, got %q", got)
 	}
 	if strings.Contains(got, "<system_instructions>") {
 		t.Fatalf("did not expect legacy system marker, got %q", got)

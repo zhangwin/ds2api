@@ -31,6 +31,20 @@ line 2 with <tags> and & symbols]]></content></parameters></tool_call>`,
 			}},
 		},
 		{
+			name: "Nested XML with repeated parameters (New Feature)",
+			text: `<tool_call><tool_name>write_file</tool_name><parameters><path>script.sh</path><content><![CDATA[#!/bin/bash
+echo "hello"
+]]></content><item>first</item><item>second</item></parameters></tool_call>`,
+			expected: []ParsedToolCall{{
+				Name: "write_file",
+				Input: map[string]any{
+					"path":    "script.sh",
+					"content": "#!/bin/bash\necho \"hello\"\n",
+					"item":    []any{"first", "second"},
+				},
+			}},
+		},
+		{
 			name: "Dirty XML with unescaped symbols (Robustness Improvement)",
 			text: `<tool_call><tool_name>bash</tool_name><parameters><command>echo "hello" > out.txt && cat out.txt</command></parameters></tool_call>`,
 			expected: []ParsedToolCall{{
