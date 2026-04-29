@@ -277,10 +277,17 @@ func (s *continueState) prepareForNextRound() {
 }
 
 func asString(v any) string {
+	if v == nil {
+		return ""
+	}
 	switch x := v.(type) {
 	case string:
 		return x
 	default:
-		return strings.TrimSpace(strings.ReplaceAll(strings.TrimSpace(fmt.Sprint(v)), "\u0000", ""))
+		s := strings.TrimSpace(strings.ReplaceAll(strings.TrimSpace(fmt.Sprint(v)), "\u0000", ""))
+		if s == "<nil>" {
+			return ""
+		}
+		return s
 	}
 }
