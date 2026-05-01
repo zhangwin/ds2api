@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"ds2api/internal/auth"
+	"ds2api/internal/config"
 	dsclient "ds2api/internal/deepseek/client"
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/promptcompat"
@@ -35,10 +36,15 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 	if strings.TrimSpace(fileText) == "" {
 		return stdReq, errors.New("current user input file produced empty transcript")
 	}
+	modelType := "default"
+	if resolvedType, ok := config.GetModelType(stdReq.ResolvedModel); ok {
+		modelType = resolvedType
+	}
 	result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
 		Filename:    currentInputFilename,
 		ContentType: currentInputContentType,
 		Purpose:     currentInputPurpose,
+		ModelType:   modelType,
 		Data:        []byte(fileText),
 	}, 3)
 	if err != nil {

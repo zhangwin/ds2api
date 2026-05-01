@@ -227,7 +227,7 @@ func TestApplyCurrentInputFileDisabledPassThrough(t *testing.T) {
 		DS: ds,
 	}
 	req := map[string]any{
-		"model":    "deepseek-v4-flash",
+		"model":    "deepseek-v4-vision",
 		"messages": historySplitTestMessages(),
 	}
 	stdReq, err := promptcompat.NormalizeOpenAIChatRequest(h.Store, req, "")
@@ -332,7 +332,7 @@ func TestApplyCurrentInputFilePreservesFullContextPromptForTokenCounting(t *test
 		DS: ds,
 	}
 	req := map[string]any{
-		"model":    "deepseek-v4-flash",
+		"model":    "deepseek-v4-vision",
 		"messages": historySplitTestMessages(),
 	}
 	stdReq, err := promptcompat.NormalizeOpenAIChatRequest(h.Store, req, "")
@@ -378,7 +378,7 @@ func TestApplyCurrentInputFileUploadsFullContextFile(t *testing.T) {
 		DS: ds,
 	}
 	req := map[string]any{
-		"model":    "deepseek-v4-flash",
+		"model":    "deepseek-v4-vision",
 		"messages": historySplitTestMessages(),
 	}
 	stdReq, err := promptcompat.NormalizeOpenAIChatRequest(h.Store, req, "")
@@ -399,6 +399,9 @@ func TestApplyCurrentInputFileUploadsFullContextFile(t *testing.T) {
 	upload := ds.uploadCalls[0]
 	if upload.Filename != "DS2API_HISTORY.txt" {
 		t.Fatalf("expected DS2API_HISTORY.txt upload, got %q", upload.Filename)
+	}
+	if upload.ModelType != "vision" {
+		t.Fatalf("expected vision model type for vision request, got %q", upload.ModelType)
 	}
 	uploadedText := string(upload.Data)
 	for _, want := range []string{"# DS2API_HISTORY.txt", "=== 1. SYSTEM ===", "=== 2. USER ===", "=== 3. ASSISTANT ===", "=== 4. TOOL ===", "=== 5. USER ===", "system instructions", "first user turn", "hidden reasoning", "tool result", "latest user turn", promptcompat.ThinkingInjectionMarker} {

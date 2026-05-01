@@ -238,6 +238,14 @@ OpenAI 文件相关实现：
 - 文件 ID 收集：
   [internal/promptcompat/file_refs.go](../internal/promptcompat/file_refs.go)
 
+OpenAI 的文件上传现在不再是“只传文件本体”的通用路径，而是会先根据请求里的 `model` 解析出 DeepSeek 的上传类型，并把它透传到上传接口的 `x-model-type`。当前可见的上传类型就是 `default` / `expert` / `vision`，其中 vision 请求上传图片时必须带上 `vision`，否则下游容易退回到仅文本或 OCR 语义。这个模型类型会同时用于：
+
+- `/v1/files` 这类独立文件上传入口
+- Chat / Responses 的 inline 图片、附件上传
+- current input file 触发时生成的 `DS2API_HISTORY.txt` 上下文文件
+
+也就是说，文件上传和完成请求的 `model_type` 现在是一致的：完成 payload 里仍然是 `model_type`，上传文件则会在 DeepSeek 上传阶段携带同样的模型类型信息。
+
 结论：
 
 - “systemprompt 文字”在 prompt 里
