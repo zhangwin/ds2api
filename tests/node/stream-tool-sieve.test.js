@@ -112,6 +112,23 @@ test('parseToolCalls parses arbitrary-prefixed tool markup shells', () => {
   }
 });
 
+test('parseToolCalls parses camel-prefixed tool markup shell', () => {
+  const payload = '<DSmartToolCalls><DSmartInvoke name="Bash"><DSmartParameter name="command"><![CDATA[git push]]></DSmartParameter><DSmartParameter name="description"><![CDATA[Push dev branch to origin]]></DSmartParameter></DSmartInvoke></DSmartToolCalls>';
+  const calls = parseToolCalls(payload, ['Bash']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, 'Bash');
+  assert.deepEqual(calls[0].input, {
+    command: 'git push',
+    description: 'Push dev branch to origin',
+  });
+});
+
+test('parseToolCalls ignores camel-prefixed tool markup lookalike', () => {
+  const payload = '<DSmartToolCallsExtra><DSmartInvoke name="Bash"><DSmartParameter name="command">git push</DSmartParameter></DSmartInvoke></DSmartToolCallsExtra>';
+  const calls = parseToolCalls(payload, ['Bash']);
+  assert.equal(calls.length, 0);
+});
+
 test('parseToolCalls parses fullwidth DSML shell drift', () => {
   const payload = `<ｄＳＭＬ｜tool_calls>
   <ｄＳＭＬ｜invoke name="Read">

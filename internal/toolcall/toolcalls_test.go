@@ -111,6 +111,25 @@ func TestParseToolCallsSupportsArbitraryPrefixedToolMarkup(t *testing.T) {
 	}
 }
 
+func TestParseToolCallsSupportsCamelPrefixedToolMarkup(t *testing.T) {
+	text := `<DSmartToolCalls><DSmartInvoke name="Bash"><DSmartParameter name="command"><![CDATA[git push]]></DSmartParameter><DSmartParameter name="description"><![CDATA[Push dev branch to origin]]></DSmartParameter></DSmartInvoke></DSmartToolCalls>`
+	calls := ParseToolCalls(text, []string{"Bash"})
+	if len(calls) != 1 {
+		t.Fatalf("expected one camel-prefixed tool call, got %#v", calls)
+	}
+	if calls[0].Name != "Bash" || calls[0].Input["command"] != "git push" || calls[0].Input["description"] != "Push dev branch to origin" {
+		t.Fatalf("unexpected camel-prefixed tool call: %#v", calls[0])
+	}
+}
+
+func TestParseToolCallsRejectsCamelPrefixedToolMarkupLookalike(t *testing.T) {
+	text := `<DSmartToolCallsExtra><DSmartInvoke name="Bash"><DSmartParameter name="command">git push</DSmartParameter></DSmartInvoke></DSmartToolCallsExtra>`
+	calls := ParseToolCalls(text, []string{"Bash"})
+	if len(calls) != 0 {
+		t.Fatalf("expected camel-prefixed lookalike to be ignored, got %#v", calls)
+	}
+}
+
 func TestParseToolCallsSupportsFullwidthDSMLShell(t *testing.T) {
 	text := `<ｄＳＭＬ｜tool_calls>
   <ｄＳＭＬ｜invoke name="Read">

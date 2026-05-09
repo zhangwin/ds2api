@@ -14,6 +14,7 @@ type toolMarkupNameAlias struct {
 var toolMarkupNames = []toolMarkupNameAlias{
 	{raw: "tool_calls", canonical: "tool_calls"},
 	{raw: "tool-calls", canonical: "tool_calls", dsmlOnly: true},
+	{raw: "toolcalls", canonical: "tool_calls", dsmlOnly: true},
 	{raw: "invoke", canonical: "invoke"},
 	{raw: "parameter", canonical: "parameter"},
 }
@@ -369,7 +370,7 @@ func matchToolMarkupNameAfterArbitraryPrefix(text string, start int) (string, in
 			if !ok {
 				continue
 			}
-			if !toolMarkupPrefixAllowsLocalName(text[start:idx]) {
+			if !toolMarkupPrefixAllowsLocalNameAt(text, start, idx) {
 				continue
 			}
 			return name.canonical, idx, nameLen, true
@@ -388,10 +389,10 @@ func hasPartialToolMarkupNameAfterArbitraryPrefix(text string, start int) bool {
 		if isToolMarkupTagTerminator(text, idx) {
 			return false
 		}
-		if toolMarkupPrefixAllowsLocalName(text[start:idx]) && hasToolMarkupNamePrefix(text, idx) {
+		if toolMarkupPrefixAllowsLocalNameAt(text, start, idx) && hasToolMarkupNamePrefix(text, idx) {
 			return true
 		}
-		if toolMarkupPrefixAllowsLocalName(text[start:idx]) && hasDSMLNamePrefixOrPartial(text, idx) {
+		if toolMarkupPrefixAllowsLocalNameAt(text, start, idx) && hasDSMLNamePrefixOrPartial(text, idx) {
 			return true
 		}
 		_, size := utf8.DecodeRuneInString(text[idx:])
@@ -401,6 +402,25 @@ func hasPartialToolMarkupNameAfterArbitraryPrefix(text string, start int) bool {
 		idx += size
 	}
 	return toolMarkupPrefixAllowsLocalName(text[start:])
+}
+
+func toolMarkupPrefixAllowsLocalNameAt(text string, start, localStart int) bool {
+	if start < 0 || localStart <= start || localStart > len(text) {
+		return false
+	}
+	prefix := text[start:localStart]
+	if toolMarkupPrefixAllowsLocalName(prefix) {
+		return true
+	}
+	if strings.ContainsAny(prefix, "=\"'") {
+		return false
+	}
+	prev, prevSize := utf8.DecodeLastRuneInString(prefix)
+	next, _ := utf8.DecodeRuneInString(text[localStart:])
+	if prevSize <= 0 || next == utf8.RuneError {
+		return false
+	}
+	return isASCIIAlphaNumeric(normalizeFullwidthASCII(prev)) && isASCIIUpper(normalizeFullwidthASCII(next))
 }
 
 func hasDSMLNamePrefixOrPartial(text string, start int) bool {
@@ -435,6 +455,14 @@ func normalizedASCIILowerString(text string) string {
 		}
 	}
 	return b.String()
+}
+
+func isASCIIAlphaNumeric(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+}
+
+func isASCIIUpper(r rune) bool {
+	return r >= 'A' && r <= 'Z'
 }
 
 func isToolMarkupTagTerminator(text string, idx int) bool {

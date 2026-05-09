@@ -5,6 +5,7 @@ const XML_ATTR_PATTERN = /\b([a-z0-9_:-]+)\s*=\s*("([^"]*)"|'([^']*)')/gi;
 const TOOL_MARKUP_NAMES = [
   { raw: 'tool_calls', canonical: 'tool_calls' },
   { raw: 'tool-calls', canonical: 'tool_calls', dsmlOnly: true },
+  { raw: 'toolcalls', canonical: 'tool_calls', dsmlOnly: true },
   { raw: 'invoke', canonical: 'invoke' },
   { raw: 'parameter', canonical: 'parameter' },
 ];
@@ -698,7 +699,7 @@ function matchToolMarkupNameAfterArbitraryPrefix(raw, start) {
     for (const name of TOOL_MARKUP_NAMES) {
       const matched = matchNormalizedASCII(raw, idx, name.raw);
       if (!matched.ok) continue;
-      if (!toolMarkupPrefixAllowsLocalName(raw.slice(start, idx))) continue;
+      if (!toolMarkupPrefixAllowsLocalNameAt(raw, start, idx)) continue;
       return { ok: true, name: name.canonical, start: idx, len: matched.len };
     }
     idx += 1;
@@ -711,10 +712,10 @@ function hasPartialToolMarkupNameAfterArbitraryPrefix(raw, start) {
     if (isToolMarkupTagTerminator(raw, idx)) {
       return false;
     }
-    if (toolMarkupPrefixAllowsLocalName(raw.slice(start, idx)) && hasToolMarkupNamePrefix(raw, idx)) {
+    if (toolMarkupPrefixAllowsLocalNameAt(raw, start, idx) && hasToolMarkupNamePrefix(raw, idx)) {
       return true;
     }
-    if (toolMarkupPrefixAllowsLocalName(raw.slice(start, idx)) && hasDSMLNamePrefixOrPartial(raw, idx)) {
+    if (toolMarkupPrefixAllowsLocalNameAt(raw, start, idx) && hasDSMLNamePrefixOrPartial(raw, idx)) {
       return true;
     }
     idx += 1;
@@ -739,6 +740,22 @@ function toolMarkupPrefixAllowsLocalName(prefix) {
   }
   const previous = normalizeFullwidthASCIIChar(prefix[prefix.length - 1] || '');
   return !/^[A-Za-z0-9]$/.test(previous);
+}
+
+function toolMarkupPrefixAllowsLocalNameAt(raw, start, localStart) {
+  if (start < 0 || localStart <= start || localStart > raw.length) {
+    return false;
+  }
+  const prefix = raw.slice(start, localStart);
+  if (toolMarkupPrefixAllowsLocalName(prefix)) {
+    return true;
+  }
+  if (/[="'"]/.test(prefix)) {
+    return false;
+  }
+  const previous = normalizeFullwidthASCIIChar(prefix[prefix.length - 1] || '');
+  const next = normalizeFullwidthASCIIChar(raw[localStart] || '');
+  return /^[A-Za-z0-9]$/.test(previous) && /^[A-Z]$/.test(next);
 }
 
 function toolMarkupPrefixContainsSlash(prefix) {
